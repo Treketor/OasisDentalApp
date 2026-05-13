@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --color-background: #f7f5f1;
+  --color-surface: #ffffff;
+  --color-text: #111111;
+  --color-muted: #6f6a63;
+  --color-border: #e5ded4;
+  --color-accent: #b6783f;
+  --color-accentDark: #8f5829;
+  --color-success: #2f6f4e;
+  --color-warning: #b7791f;
+  --color-urgent: #b3261e;
+  --font-heading: 'Barlow Condensed', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    background: #f7f5f1;
+    color: #111111;
+    font-family: var(--font-body);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    background: #f7f5f1;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin: 0;
+    font-family: var(--font-heading);
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  p {
+    margin: 0;
+  }
+}
