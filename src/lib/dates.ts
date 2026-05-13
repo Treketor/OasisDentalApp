@@ -22,9 +22,20 @@ export function isDueSoon(value: string | null) {
 
 export function formatDueDate(value: string | null) {
   if (!value) return 'No date'
+  const date = new Date(value)
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(today.getDate() + 1)
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
   if (isOverdue(value)) return 'Overdue'
   if (isDueToday(value)) return 'Due today'
   if (isDueSoon(value)) return 'Due soon'
+  if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
+
+  const diffDays = Math.ceil((date.getTime() - today.getTime()) / 86400000)
+  if (diffDays > 1 && diffDays <= 7) return `Due in ${diffDays} days`
 
   return new Intl.DateTimeFormat(undefined, {
     day: 'numeric',

@@ -1,6 +1,7 @@
 import type { NotificationWithRelations } from '../../lib/notifications'
 import { formatRelativeTime } from '../../lib/dates'
 import { EmptyState } from '../ui/EmptyState'
+import { Skeleton } from '../ui/Skeleton'
 
 interface NotificationListProps {
   notifications: NotificationWithRelations[]
@@ -16,7 +17,13 @@ export function NotificationList({
   onNotificationClick,
 }: NotificationListProps) {
   if (loading) {
-    return <p className="px-4 py-6 text-sm text-muted">Loading notifications...</p>
+    return (
+      <div className="space-y-3 p-4">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+      </div>
+    )
   }
 
   if (error) {

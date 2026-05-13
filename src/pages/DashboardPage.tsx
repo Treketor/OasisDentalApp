@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { useAuth } from '../components/auth/useAuth'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Card } from '../components/ui/Card'
+import { Skeleton, TaskListSkeleton } from '../components/ui/Skeleton'
 import { PriorityPill } from '../components/ui/PriorityPill'
 import { StatusPill } from '../components/ui/StatusPill'
 import { useTasks } from '../hooks/useTasks'
@@ -96,7 +97,13 @@ export function DashboardPage() {
       </section>
 
       {error ? <p className="rounded-lg border border-urgent/30 bg-urgent/5 px-4 py-3 text-sm text-urgent">{error}</p> : null}
-      {loading ? <p className="text-sm text-muted">Loading tasks...</p> : null}
+      {loading ? (
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <Skeleton key={index} className="h-28 w-full" />
+          ))}
+        </section>
+      ) : null}
 
       {showPendingAlert ? (
         <Card className="flex flex-col justify-between gap-4 border-accent/40 bg-surface md:flex-row md:items-center">
@@ -115,16 +122,18 @@ export function DashboardPage() {
         </Card>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      {!loading ? <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {summary.map((item) => (
           <Card key={item.label} className="p-5">
             <p className="text-sm font-medium text-muted">{item.label}</p>
             <p className="mt-4 font-heading text-5xl font-semibold leading-none text-text">{item.value}</p>
           </Card>
         ))}
-      </section>
+      </section> : null}
 
-      {!loading && tasks.length === 0 ? (
+      {loading ? (
+        <TaskListSkeleton />
+      ) : tasks.length === 0 ? (
         <EmptyState title="No tasks yet" message="Create the first handover task for the clinic team." />
       ) : (
         <div className="grid gap-8 xl:grid-cols-3">

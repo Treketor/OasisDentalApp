@@ -10,6 +10,7 @@ import type {
   Task,
   TaskCategory,
   TaskComment,
+  TaskEvent,
   TaskPriority,
   TaskStatus,
 } from '../types/database'
@@ -20,6 +21,10 @@ export interface TaskWithProfiles extends Task {
 }
 
 export interface TaskCommentWithProfile extends TaskComment {
+  profile: Pick<Profile, 'id' | 'full_name' | 'role'> | null
+}
+
+export interface TaskEventWithProfile extends TaskEvent {
   profile: Pick<Profile, 'id' | 'full_name' | 'role'> | null
 }
 
@@ -306,6 +311,20 @@ export async function getTaskComments(taskId: string) {
   }
 
   return (data ?? []) as TaskCommentWithProfile[]
+}
+
+export async function getTaskEvents(taskId: string) {
+  const { data, error } = await supabase
+    .from('task_events')
+    .select('*, profile:profiles!task_events_user_id_fkey(id, full_name, role)')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data ?? []) as TaskEventWithProfile[]
 }
 
 export async function addTaskComment(taskId: string, body: string) {

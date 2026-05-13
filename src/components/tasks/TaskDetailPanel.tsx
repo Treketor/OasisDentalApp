@@ -1,10 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { canDeleteTasks } from '../../lib/permissions'
 import {
   addTaskComment,
   getTaskComments,
+  getTaskEvents,
   type TaskCommentWithProfile,
+  type TaskEventWithProfile,
   type TaskWithProfiles,
   type UpdateTaskInput,
 } from '../../lib/tasks'
@@ -26,6 +29,7 @@ import { PriorityPill } from '../ui/PriorityPill'
 import { Select } from '../ui/Select'
 import { StatusPill } from '../ui/StatusPill'
 import { Textarea } from '../ui/Textarea'
+import { Skeleton } from '../ui/Skeleton'
 
 interface TaskDetailPanelProps {
   task: TaskWithProfiles
@@ -58,8 +62,10 @@ export function TaskDetailPanel({
   const [dueDate, setDueDate] = useState(task.due_date ? task.due_date.slice(0, 16) : '')
   const [location, setLocation] = useState(task.location ?? '')
   const [comments, setComments] = useState<TaskCommentWithProfile[]>([])
+  const [events, setEvents] = useState<TaskEventWithProfile[]>([])
   const [commentBody, setCommentBody] = useState('')
   const [loadingComments, setLoadingComments] = useState(true)
+  const [loadingEvents, setLoadingEvents] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -74,8 +80,19 @@ export function TaskDetailPanel({
         setLoadingComments(false)
       }
     }
+    async function loadEvents() {
+      setLoadingEvents(true)
+      try {
+        setEvents(await getTaskEvents(task.id))
+      } catch {
+        setEvents([])
+      } finally {
+        setLoadingEvents(false)
+      }
+    }
 
     void loadComments()
+    void loadEvents()
 
     const channel = supabase
       .channel(`task-comments-${task.id}`)
@@ -85,9 +102,18 @@ export function TaskDetailPanel({
         () => void loadComments(),
       )
       .subscribe()
+    const eventsChannel = supabase
+      .channel(`task-events-${task.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'task_events', filter: `task_id=eq.${task.id}` },
+        () => void loadEvents(),
+      )
+      .subscribe()
 
     return () => {
       void supabase.removeChannel(channel)
+      void supabase.removeChannel(eventsChannel)
     }
   }, [task.id])
 
@@ -107,8 +133,10 @@ export function TaskDetailPanel({
         due_date: dueDate ? new Date(dueDate).toISOString() : null,
         location: location.trim() || null,
       })
+      toast.success('Task updated')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update task.')
+      toast.error('Task update failed')
     } finally {
       setSaving(false)
     }
@@ -118,9 +146,11 @@ export function TaskDetailPanel({
     setStatus(nextStatus)
     try {
       await onStatusChange(task.id, nextStatus)
+      toast.success('Status updated')
     } catch (err) {
       setStatus(task.status)
       setError(err instanceof Error ? err.message : 'Failed to update status.')
+      toast.error('Status update failed')
     }
   }
 
@@ -132,13 +162,27 @@ export function TaskDetailPanel({
       const comment = await addTaskComment(task.id, commentBody)
       setComments((current) => [...current, comment])
       setCommentBody('')
+      toast.success('Comment added')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add comment.')
+      toast.error('Comment failed')
     }
   }
 
+  function describeEvent(event: TaskEventWithProfile) {
+    const labels: Record<string, string> = {
+      task_created: 'Task created',
+      task_updated: 'Task updated',
+      status_changed: 'Status changed',
+      task_completed: 'Task completed',
+      task_deleted: 'Task deleted',
+      comment_added: 'Comment added',
+    }
+    return labels[event.event_type] ?? event.event_type.replaceAll('_', ' ')
+  }
+
   return (
-    <div className="fixed inset-0 z-50 bg-text/30 lg:flex lg:justify-end">
+    <div className="fixed inset-0 z-50 bg-text/30 lg:flex lg:justify-end" role="dialog" aria-modal="true" aria-label="Task detail">
       <aside className="ml-auto flex h-full w-full flex-col overflow-y-auto border-l border-border bg-surface p-5 shadow-xl lg:max-w-2xl lg:p-8">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
@@ -156,10 +200,19 @@ export function TaskDetailPanel({
         {error ? <p className="mb-4 rounded-lg border border-urgent/30 bg-urgent/5 px-4 py-3 text-sm text-urgent">{error}</p> : null}
 
         <form className="space-y-4" onSubmit={saveChanges}>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} />
-          <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description" />
+          <label className="block text-sm font-semibold text-text">
+            Title
+            <Input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-2" />
+          </label>
+          <label className="block text-sm font-semibold text-text">
+            Description
+            <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description" className="mt-2" />
+          </label>
           <div>
-            <Input value={patientReference} onChange={(event) => setPatientReference(event.target.value)} placeholder="Patient reference" />
+            <label className="block text-sm font-semibold text-text">
+              Patient reference
+              <Input value={patientReference} maxLength={24} onChange={(event) => setPatientReference(event.target.value)} placeholder="Patient reference" className="mt-2" />
+            </label>
             <p className="mt-2 text-xs text-muted">Use initials or an internal reference only.</p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -201,7 +254,7 @@ export function TaskDetailPanel({
 
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={saving}>{saving ? 'Saving' : 'Save changes'}</Button>
-            <Button type="button" variant="secondary" onClick={() => void onComplete(task.id)}>Mark complete</Button>
+            <Button type="button" variant="secondary" onClick={() => void onComplete(task.id).then(() => toast.success('Task completed')).catch(() => toast.error('Complete failed'))}>Mark complete</Button>
             {canDelete ? (
               <Button
                 type="button"
@@ -209,9 +262,11 @@ export function TaskDetailPanel({
                 onClick={async () => {
                   try {
                     await onDelete(task.id)
+                    toast.success('Task deleted')
                     onClose()
                   } catch (err) {
                     setError(err instanceof Error ? err.message : 'Failed to delete task.')
+                    toast.error('Delete failed')
                   }
                 }}
               >
@@ -240,6 +295,27 @@ export function TaskDetailPanel({
             <Textarea value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Add a handover comment" className="min-h-24" />
             <Button type="submit" className="self-start">Add comment</Button>
           </form>
+        </section>
+        <section className="mt-8 border-t border-border pt-6">
+          <h3 className="font-heading text-3xl font-semibold uppercase text-text">Activity</h3>
+          <div className="mt-4 space-y-3">
+            {loadingEvents ? (
+              <>
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+              </>
+            ) : null}
+            {!loadingEvents && events.length === 0 ? <p className="text-sm text-muted">No activity yet.</p> : null}
+            {events.map((event) => (
+              <div key={event.id} className="rounded-lg border border-border bg-background p-3">
+                <div className="flex justify-between gap-3 text-sm">
+                  <span className="font-semibold text-text">{describeEvent(event)}</span>
+                  <span className="text-xs text-muted">{formatDateTime(event.created_at)}</span>
+                </div>
+                <p className="mt-1 text-xs text-muted">{event.profile?.full_name ?? 'System'}</p>
+              </div>
+            ))}
+          </div>
         </section>
       </aside>
     </div>

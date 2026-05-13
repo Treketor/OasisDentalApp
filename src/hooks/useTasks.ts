@@ -5,6 +5,7 @@ import {
   createTask as createTaskService,
   deleteTask as deleteTaskService,
   getVisibleTasks,
+  getTaskById,
   updateTask as updateTaskService,
   updateTaskStatus as updateTaskStatusService,
   type CreateTaskInput,
@@ -118,6 +119,10 @@ export function useTasks() {
     setTasks((current) => current.filter((task) => task.id !== taskId))
   }, [])
 
+  const getTask = useCallback(async (taskId: string) => {
+    return getTaskById(taskId)
+  }, [])
+
   return {
     tasks,
     loading,
@@ -128,5 +133,6 @@ export function useTasks() {
     updateTaskStatus,
     completeTask,
     deleteTask,
+    getTask,
   }
 }

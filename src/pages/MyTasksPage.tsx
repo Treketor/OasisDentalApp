@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { TaskDetailPanel } from '../components/tasks/TaskDetailPanel'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Input } from '../components/ui/Input'
 import { PriorityPill } from '../components/ui/PriorityPill'
 import { Select } from '../components/ui/Select'
+import { TaskListSkeleton } from '../components/ui/Skeleton'
 import { StatusPill } from '../components/ui/StatusPill'
 import { useAuth } from '../components/auth/useAuth'
 import { useAssignableProfiles } from '../hooks/useAssignableProfiles'
@@ -110,6 +112,20 @@ export function MyTasksPage() {
 
   const selectedLiveTask = selectedTask ? tasks.find((task) => task.id === selectedTask.id) ?? selectedTask : null
 
+  async function runQuickAction(taskId: string, nextStatus: TaskStatus) {
+    try {
+      if (nextStatus === 'completed') {
+        await completeTask(taskId)
+        toast.success('Task completed')
+      } else {
+        await updateTaskStatus(taskId, nextStatus)
+        toast.success('Task updated')
+      }
+    } catch {
+      toast.error('Task update failed')
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div>
@@ -177,25 +193,23 @@ export function MyTasksPage() {
       </div>
 
       {error ? <p className="rounded-lg border border-urgent/30 bg-urgent/5 px-4 py-3 text-sm text-urgent">{error}</p> : null}
-      {loading ? <p className="text-sm text-muted">Loading tasks...</p> : null}
+      {loading ? <TaskListSkeleton /> : null}
 
       {!loading && filteredTasks.length === 0 ? (
         <EmptyState title="No matching tasks" message="Adjust filters or create a new handover task." />
-      ) : (
+      ) : !loading ? (
         <div className="divide-y divide-border rounded-lg border border-border bg-surface">
           {filteredTasks.map((task) => (
-            <button
+            <article
               key={task.id}
-              type="button"
               className={cn(
                 'grid w-full gap-4 px-5 py-4 text-left transition hover:bg-background lg:grid-cols-[1fr_140px_140px_120px]',
                 task.status === 'completed' ? 'opacity-60' : '',
                 task.status === 'waiting' ? 'bg-warning/5' : '',
                 isOverdue(task.due_date) && task.status !== 'completed' ? 'border-l-2 border-l-urgent' : '',
               )}
-              onClick={() => setSelectedTask(task)}
             >
-              <div>
+              <button type="button" className="text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" onClick={() => setSelectedTask(task)}>
                 <div className="mb-2 flex flex-wrap gap-2">
                   <PriorityPill priority={task.priority} />
                   <StatusPill status={task.status} />
@@ -206,7 +220,7 @@ export function MyTasksPage() {
                 <h3 className="font-semibold text-text">{task.title}</h3>
                 <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted">{task.description || 'No description'}</p>
                 {task.patient_reference ? <p className="mt-2 text-xs font-semibold text-accentDark">Ref: {task.patient_reference}</p> : null}
-              </div>
+              </button>
               <div className="text-sm text-muted">
                 <span className="lg:hidden">Assigned: </span>{task.assigned_to_profile?.full_name ?? 'Unassigned'}
               </div>
@@ -219,10 +233,27 @@ export function MyTasksPage() {
               <div className="text-sm text-muted">
                 <span className="lg:hidden">Created: </span>{formatDate(task.created_at)}
               </div>
-            </button>
+              <div className="flex flex-wrap gap-2 lg:col-span-4">
+                {['new', 'waiting'].includes(task.status) ? (
+                  <button type="button" className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted hover:border-accent hover:text-text" onClick={() => void runQuickAction(task.id, 'in_progress')}>
+                    Start
+                  </button>
+                ) : null}
+                {!['completed', 'cancelled'].includes(task.status) ? (
+                  <>
+                    <button type="button" className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted hover:border-warning hover:text-warning" onClick={() => void runQuickAction(task.id, 'waiting')}>
+                      Wait
+                    </button>
+                    <button type="button" className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted hover:border-success hover:text-success" onClick={() => void runQuickAction(task.id, 'completed')}>
+                      Complete
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </article>
           ))}
         </div>
-      )}
+      ) : null}
 
       {selectedLiveTask ? (
         <TaskDetailPanel

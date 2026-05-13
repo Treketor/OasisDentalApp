@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { useAuth } from '../components/auth/useAuth'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
@@ -6,6 +7,7 @@ import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
+import { Skeleton } from '../components/ui/Skeleton'
 import { useProfiles } from '../hooks/useProfiles'
 import { canEditUserRole, canManageUsers } from '../lib/permissions'
 import { formatDate, roleLabels } from '../lib/taskLabels'
@@ -62,8 +64,10 @@ function StaffCard({
         role: canEditRole ? role : undefined,
         location: location.trim() || null,
       })
+      toast.success('Profile updated')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update staff profile.')
+      toast.error('Profile update failed')
     } finally {
       setSaving(false)
     }
@@ -95,7 +99,11 @@ function StaffCard({
             type="button"
             variant="secondary"
             disabled={isSelf}
-            onClick={() => void onDeactivate(profile.id)}
+            onClick={() =>
+              void onDeactivate(profile.id)
+                .then(() => toast.success('Profile deactivated'))
+                .catch(() => toast.error('Deactivation failed'))
+            }
           >
             Deactivate
           </Button>
@@ -126,8 +134,10 @@ function PendingProfileCard({
     setError('')
     try {
       await onApprove(profile.id, role, location)
+      toast.success('Profile approved')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to approve profile.')
+      toast.error('Approval failed')
     } finally {
       setSaving(false)
     }
@@ -138,8 +148,10 @@ function PendingProfileCard({
     setError('')
     try {
       await onReject(profile.id)
+      toast.success('Profile rejected')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reject profile.')
+      toast.error('Rejection failed')
     } finally {
       setSaving(false)
     }
@@ -246,7 +258,13 @@ export function TeamPage() {
       />
 
       {error ? <p className="rounded-lg border border-urgent/30 bg-urgent/5 px-4 py-3 text-sm text-urgent">{error}</p> : null}
-      {loading ? <p className="text-sm text-muted">Loading team...</p> : null}
+      {loading ? (
+        <div className="grid gap-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      ) : null}
 
       {!loading && visibleProfiles.length === 0 ? (
         <EmptyState title="No staff found" message="No profiles match the current view." />

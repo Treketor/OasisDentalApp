@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useState } from 'react'
 import { useAuth } from '../auth/useAuth'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
@@ -22,6 +23,7 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 
 export function AppShell() {
   const { profile, signOut } = useAuth()
+  const [accountOpen, setAccountOpen] = useState(false)
   const showNavigation = profile?.is_approved === true
 
   return (
@@ -42,6 +44,27 @@ export function AppShell() {
               </>
             ) : null}
             {showNavigation ? <NotificationBell /> : null}
+            {profile ? (
+              <div className="relative md:hidden">
+                <button
+                  type="button"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-surface text-sm font-semibold text-text"
+                  aria-label="Account menu"
+                  onClick={() => setAccountOpen((value) => !value)}
+                >
+                  {profile.full_name.slice(0, 1)}
+                </button>
+                {accountOpen ? (
+                  <div className="absolute right-0 top-14 z-50 w-56 rounded-lg border border-border bg-surface p-4 shadow-xl">
+                    <p className="text-sm font-semibold text-text">{profile.full_name}</p>
+                    <p className="mt-1 text-xs text-muted">{roleLabels[profile.role]}</p>
+                    <Button type="button" variant="secondary" className="mt-4 w-full" onClick={signOut}>
+                      Sign out
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <Button type="button" variant="secondary" className="hidden md:inline-flex" onClick={signOut}>
               Sign out
             </Button>

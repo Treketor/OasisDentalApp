@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useNotifications } from '../../hooks/useNotifications'
 import type { NotificationWithRelations } from '../../lib/notifications'
 import { Button } from '../ui/Button'
@@ -20,10 +21,11 @@ export function NotificationBell() {
 
   async function handleNotificationClick(notification: NotificationWithRelations) {
     await markNotificationRead(notification.id)
+    toast.success('Notification marked read')
     setOpen(false)
 
     if (notification.task_id) {
-      navigate(`/my-tasks?task=${notification.task_id}`)
+      navigate(`/tasks/${notification.task_id}`)
     }
   }
 
@@ -50,7 +52,7 @@ export function NotificationBell() {
               <p className="font-heading text-2xl font-semibold uppercase text-text">Notifications</p>
               <p className="text-xs text-muted">{unreadCount} unread</p>
             </div>
-            <Button type="button" variant="ghost" onClick={() => void markAllNotificationsRead()}>
+            <Button type="button" variant="ghost" onClick={() => void markAllNotificationsRead().then(() => toast.success('Notifications marked read'))}>
               Mark all read
             </Button>
           </div>

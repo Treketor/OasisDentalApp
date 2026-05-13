@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useAssignableProfiles } from '../../hooks/useAssignableProfiles'
 import { createTask } from '../../lib/tasks'
 import { categoryLabels, priorityLabels, taskCategories, taskPriorities } from '../../lib/taskLabels'
@@ -32,6 +33,11 @@ export function TaskForm() {
 
     if (title.trim().length < 3) {
       setError('Add a clear task title.')
+      toast.error('Task title is required')
+      return
+    }
+    if (patientReference.trim().length > 24) {
+      setError('Keep patient reference under 24 characters.')
       return
     }
 
@@ -49,9 +55,11 @@ export function TaskForm() {
         location,
       })
       setSuccess('Task created.')
+      toast.success('Task created')
       navigate('/my-tasks')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create task.')
+      toast.error('Task creation failed')
     } finally {
       setLoading(false)
     }
@@ -73,9 +81,10 @@ export function TaskForm() {
             value={patientReference}
             onChange={(event) => setPatientReference(event.target.value)}
             placeholder="Patient reference, optional"
+            maxLength={24}
           />
           <p className="mt-2 text-xs leading-5 text-muted">
-            Use initials or an internal reference only. Do not enter full patient names or medical details.
+            Use initials or an internal reference only. Do not enter full patient names or medical details. {patientReference.length}/24
           </p>
         </div>
 

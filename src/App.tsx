@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage'
 import { MyTasksPage } from './pages/MyTasksPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { TeamPage } from './pages/TeamPage'
+import { TaskDetailPage } from './pages/TaskDetailPage'
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/my-tasks" element={<MyTasksPage />} />
         <Route path="/create" element={<CreateTaskPage />} />
         <Route path="/team" element={<TeamPage />} />
+        <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

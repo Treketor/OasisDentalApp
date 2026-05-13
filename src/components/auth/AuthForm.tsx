@@ -16,8 +16,18 @@ const roleOptions: Array<{ value: RequestedRole; label: string }> = [
 ]
 
 function getAuthErrorMessage(message: string) {
-  if (message.toLowerCase().includes('email not confirmed')) {
+  const lowerMessage = message.toLowerCase()
+  if (lowerMessage.includes('email not confirmed')) {
     return 'Email not confirmed. Confirm the user email in Supabase Auth, or disable email confirmation for this internal app during development.'
+  }
+  if (lowerMessage.includes('invalid login credentials')) {
+    return 'The email or password is incorrect.'
+  }
+  if (lowerMessage.includes('rate limit')) {
+    return 'Too many attempts. Wait a few minutes before trying again.'
+  }
+  if (lowerMessage.includes('already registered')) {
+    return 'An account already exists for that email.'
   }
 
   return message
