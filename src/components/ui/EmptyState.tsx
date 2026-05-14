@@ -11,8 +11,8 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, message, actionLabel, onAction, children }: EmptyStateProps) {
   return (
-    <div className="rounded-lg border border-dashed border-border bg-surface px-6 py-10 text-center">
-      <h3 className="font-heading text-2xl font-semibold uppercase text-text">{title}</h3>
+    <div className="rounded-2xl border border-dashed border-border bg-surface/70 px-5 py-7 text-center">
+      <h3 className="font-heading text-2xl font-semibold text-text">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">{message}</p>
       {actionLabel && onAction ? (
         <Button type="button" className="mt-6" onClick={onAction}>

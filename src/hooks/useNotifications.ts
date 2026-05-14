@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../components/auth/useAuth'
 import {
   getNotifications,
@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 
 export function useNotifications() {
   const { user } = useAuth()
+  const channelIdRef = useRef(crypto.randomUUID())
   const [notifications, setNotifications] = useState<NotificationWithRelations[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -43,7 +44,7 @@ export function useNotifications() {
     }
 
     const channel = supabase
-      .channel(`notifications-${user.id}`)
+      .channel(`notifications-${user.id}-${channelIdRef.current}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },

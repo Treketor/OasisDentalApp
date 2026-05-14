@@ -16,6 +16,68 @@
   --font-body: 'Inter', sans-serif;
 }
 
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media print {
+  header,
+  aside:not(.task-print-detail),
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  body,
+  html {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  .task-print-detail {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .task-print-detail * {
+    color: #000000 !important;
+    background: transparent !important;
+    border-color: #999999 !important;
+  }
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -57,7 +119,6 @@
     margin: 0;
     font-family: var(--font-heading);
     letter-spacing: 0;
-    text-transform: uppercase;
   }
 
   p {

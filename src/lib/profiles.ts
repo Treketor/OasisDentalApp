@@ -5,6 +5,7 @@ import { createApprovalGrantedNotification } from './notifications'
 export interface ProfileUpdateInput {
   full_name?: string
   role?: UserRole
+  staff_category?: string | null
   location?: string | null
   is_approved?: boolean
   is_active?: boolean
@@ -17,6 +18,10 @@ export interface ProfileUpdateInput {
 function getFriendlyProfileError(message: string) {
   if (message.includes('is_active') || message.includes('approved_at') || message.includes('rejected_at')) {
     return 'Profile management fields are missing. Run supabase/profile-management-migration.sql in Supabase.'
+  }
+
+  if (message.includes('staff_category')) {
+    return 'Staff category settings are not set up yet. Run supabase/workspace-settings-migration.sql in Supabase.'
   }
 
   if (message.toLowerCase().includes('row-level security')) {
@@ -112,12 +117,14 @@ export async function updateProfile(profileId: string, updates: ProfileUpdateInp
   return data as Profile
 }
 
-export async function approveProfile(profileId: string, role: UserRole, location?: string | null) {
+export async function approveProfile(profileId: string, role: UserRole, staffCategory?: string | null) {
+  // Future hardening: approval/rejection workflows are good candidates for
+  // server-side RPCs that validate role changes and emit audit records together.
   const userId = await getCurrentUserId()
 
   const profile = await updateProfile(profileId, {
     role,
-    location: location?.trim() || null,
+    staff_category: staffCategory || null,
     is_approved: true,
     is_active: true,
     approved_at: new Date().toISOString(),

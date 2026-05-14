@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { createTaskOverdueNotification } from '../lib/notifications'
+import { isOverdue } from '../lib/dates'
 import {
   completeTask as completeTaskService,
   createTask as createTaskService,
@@ -15,6 +17,7 @@ import {
 import type { TaskStatus } from '../types/database'
 
 export function useTasks() {
+  const channelNameRef = useRef(`tasks-realtime-${crypto.randomUUID()}`)
   const [tasks, setTasks] = useState<TaskWithProfiles[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -38,7 +41,7 @@ export function useTasks() {
     }, 0)
 
     const channel = supabase
-      .channel('tasks-realtime')
+      .channel(channelNameRef.current)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
         void refreshTasks()
       })
@@ -49,6 +52,32 @@ export function useTasks() {
       void supabase.removeChannel(channel)
     }
   }, [refreshTasks])
+
+  useEffect(() => {
+    async function notifyOverdueTasks() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+
+      const todayKey = new Date().toISOString().slice(0, 10)
+      const overdueTasks = tasks.filter((task) =>
+        task.status !== 'completed'
+        && task.status !== 'cancelled'
+        && isOverdue(task.due_date)
+        && (task.assigned_to === user.id || task.created_by === user.id),
+      )
+
+      overdueTasks.forEach((task) => {
+        const storageKey = `oasis-overdue-notified:${todayKey}:${task.id}:${user.id}`
+        if (window.localStorage.getItem(storageKey)) return
+        window.localStorage.setItem(storageKey, '1')
+        void createTaskOverdueNotification(task.id, user.id)
+      })
+    }
+
+    if (tasks.length > 0) void notifyOverdueTasks()
+  }, [tasks])
 
   const createTask = useCallback(
     async (input: CreateTaskInput) => {

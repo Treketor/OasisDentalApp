@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 import type { Profile } from '../../types/database'
 import { AuthContext } from './AuthContext'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const profileChannelIdRef = useRef(crypto.randomUUID())
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -83,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return undefined
 
     const channel = supabase
-      .channel(`current-profile-${user.id}`)
+      .channel(`current-profile-${user.id}-${profileChannelIdRef.current}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },

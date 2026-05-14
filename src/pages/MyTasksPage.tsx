@@ -1,106 +1,96 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { toast } from 'sonner'
-import { TaskDetailPanel } from '../components/tasks/TaskDetailPanel'
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { SlidersHorizontal } from 'lucide-react'
+import { TaskCard } from '../components/tasks/TaskCard'
+import { TaskCategoryPicker } from '../components/tasks/TaskCategoryPicker'
+import { useTaskModal } from '../components/tasks/useTaskModal'
+import { Button } from '../components/ui/Button'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Input } from '../components/ui/Input'
-import { PriorityPill } from '../components/ui/PriorityPill'
 import { Select } from '../components/ui/Select'
 import { TaskListSkeleton } from '../components/ui/Skeleton'
-import { StatusPill } from '../components/ui/StatusPill'
 import { useAuth } from '../components/auth/useAuth'
 import { useAssignableProfiles } from '../hooks/useAssignableProfiles'
+import { useTaskCategories } from '../hooks/useTaskCategories'
 import { useTasks } from '../hooks/useTasks'
-import {
-  categoryLabels,
-  formatDate,
-  priorityLabels,
-  statusLabels,
-  taskCategories,
-  taskPriorities,
-  taskStatuses,
-} from '../lib/taskLabels'
-import { formatDueDate, isDueToday, isOverdue, isThisWeek } from '../lib/dates'
-import type { TaskWithProfiles } from '../lib/tasks'
-import type { TaskCategory, TaskPriority, TaskStatus } from '../types/database'
 import { cn } from '../lib/cn'
+import { isDueToday, isOverdue } from '../lib/dates'
+import { isManagerOrAdmin } from '../lib/permissions'
+import { priorityLabels, statusLabels, taskPriorities, taskStatuses } from '../lib/taskLabels'
+import type { TaskCategory, TaskPriority, TaskStatus } from '../types/database'
 
-type Tab = 'assigned' | 'created' | 'open' | 'completed'
-type SortMode = 'priority' | 'due_date' | 'newest'
-type QuickFilter = 'due_today' | 'overdue' | 'urgent' | 'waiting' | 'unassigned' | 'completed_week'
+type Tab = 'mine' | 'team' | 'created' | 'done'
+type SortMode = 'attention' | 'due_date' | 'newest'
+type DueFilter = '' | 'overdue' | 'due_today' | 'no_date'
 
 const tabs: Array<{ value: Tab; label: string }> = [
-  { value: 'assigned', label: 'Assigned to me' },
-  { value: 'created', label: 'Created by me' },
-  { value: 'open', label: 'All open' },
-  { value: 'completed', label: 'Completed' },
+  { value: 'mine', label: 'Mine' },
+  { value: 'team', label: 'Team' },
+  { value: 'created', label: 'Created' },
+  { value: 'done', label: 'Done' },
 ]
 
-const quickFilters: Array<{ value: QuickFilter; label: string }> = [
-  { value: 'due_today', label: 'Due today' },
-  { value: 'overdue', label: 'Overdue' },
-  { value: 'urgent', label: 'Urgent' },
-  { value: 'waiting', label: 'Waiting' },
-  { value: 'unassigned', label: 'Unassigned' },
-  { value: 'completed_week', label: 'Completed this week' },
-]
+function attentionWeight(task: { due_date: string | null; priority: TaskPriority }) {
+  if (isOverdue(task.due_date)) return 0
+  if (isDueToday(task.due_date)) return 1
+  if (task.priority === 'urgent') return 2
+  return 3
+}
 
-function priorityWeight(priority: TaskPriority) {
-  return priority === 'urgent' ? 0 : priority === 'normal' ? 1 : 2
+function emptyMessage(tab: Tab) {
+  if (tab === 'mine') return 'No tasks assigned to you.'
+  if (tab === 'team') return 'No open team tasks.'
+  if (tab === 'created') return 'You have not created any tasks.'
+  return 'No completed tasks yet.'
 }
 
 export function MyTasksPage() {
-  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const { openTask } = useTaskModal()
   const { profile } = useAuth()
   const { profiles } = useAssignableProfiles()
-  const { tasks, loading, error, updateTask, updateTaskStatus, completeTask, deleteTask } = useTasks()
-  const [activeTab, setActiveTab] = useState<Tab>('assigned')
+  const { data: categories } = useTaskCategories()
+  const { tasks, loading, error, updateTaskStatus, completeTask } = useTasks()
+  const [activeTab, setActiveTab] = useState<Tab>('mine')
   const [search, setSearch] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [status, setStatus] = useState<TaskStatus | ''>('')
   const [priority, setPriority] = useState<TaskPriority | ''>('')
   const [category, setCategory] = useState<TaskCategory | ''>('')
   const [assignee, setAssignee] = useState('')
-  const [sort, setSort] = useState<SortMode>('priority')
-  const [quickFilter, setQuickFilter] = useState<QuickFilter | ''>('')
-  const [selectedTask, setSelectedTask] = useState<TaskWithProfiles | null>(null)
-
-  useEffect(() => {
-    const taskId = searchParams.get('task')
-    if (!taskId || tasks.length === 0) return
-    const task = tasks.find((item) => item.id === taskId)
-    if (task) {
-      window.setTimeout(() => setSelectedTask(task), 0)
-    }
-  }, [searchParams, tasks])
+  const [dueFilter, setDueFilter] = useState<DueFilter>('')
+  const [sort, setSort] = useState<SortMode>('attention')
 
   const filteredTasks = useMemo(() => {
     const query = search.trim().toLowerCase()
     const currentUserId = profile?.id
+    const manager = isManagerOrAdmin(profile)
 
     return tasks
       .filter((task) => {
-        if (activeTab === 'assigned' && task.assigned_to !== currentUserId) return false
+        if (activeTab === 'mine' && task.assigned_to !== currentUserId) return false
+        if (activeTab === 'team' && ['completed', 'cancelled'].includes(task.status)) return false
+        if (activeTab === 'team' && !manager && task.assigned_to !== currentUserId && task.created_by !== currentUserId) return false
         if (activeTab === 'created' && task.created_by !== currentUserId) return false
-        if (activeTab === 'open' && ['completed', 'cancelled'].includes(task.status)) return false
-        if (activeTab === 'completed' && task.status !== 'completed') return false
+        if (activeTab === 'done' && !['completed', 'cancelled'].includes(task.status)) return false
+        if (activeTab !== 'done' && ['completed', 'cancelled'].includes(task.status)) return false
         if (status && task.status !== status) return false
         if (priority && task.priority !== priority) return false
         if (category && task.category !== category) return false
         if (assignee && task.assigned_to !== assignee) return false
-        if (quickFilter === 'due_today' && !isDueToday(task.due_date)) return false
-        if (quickFilter === 'overdue' && !isOverdue(task.due_date)) return false
-        if (quickFilter === 'urgent' && task.priority !== 'urgent') return false
-        if (quickFilter === 'waiting' && task.status !== 'waiting') return false
-        if (quickFilter === 'unassigned' && task.assigned_to) return false
-        if (quickFilter === 'completed_week' && !(task.status === 'completed' && isThisWeek(task.completed_at))) return false
+        if (dueFilter === 'overdue' && !isOverdue(task.due_date)) return false
+        if (dueFilter === 'due_today' && !isDueToday(task.due_date)) return false
+        if (dueFilter === 'no_date' && task.due_date) return false
         if (!query) return true
-
         return [task.title, task.description, task.patient_reference]
           .filter(Boolean)
           .some((value) => value?.toLowerCase().includes(query))
       })
       .sort((a, b) => {
-        if (sort === 'priority') return priorityWeight(a.priority) - priorityWeight(b.priority)
+        if (sort === 'attention') {
+          const diff = attentionWeight(a) - attentionWeight(b)
+          if (diff !== 0) return diff
+        }
         if (sort === 'due_date') {
           if (a.due_date && b.due_date) return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
           if (a.due_date) return -1
@@ -108,39 +98,26 @@ export function MyTasksPage() {
         }
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       })
-  }, [activeTab, assignee, category, priority, profile?.id, quickFilter, search, sort, status, tasks])
-
-  const selectedLiveTask = selectedTask ? tasks.find((task) => task.id === selectedTask.id) ?? selectedTask : null
-
-  async function runQuickAction(taskId: string, nextStatus: TaskStatus) {
-    try {
-      if (nextStatus === 'completed') {
-        await completeTask(taskId)
-        toast.success('Task completed')
-      } else {
-        await updateTaskStatus(taskId, nextStatus)
-        toast.success('Task updated')
-      }
-    } catch {
-      toast.error('Task update failed')
-    }
-  }
+  }, [activeTab, assignee, category, dueFilter, priority, profile, search, sort, status, tasks])
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div>
-        <h1 className="font-heading text-5xl font-bold uppercase text-text">My Tasks</h1>
-        <p className="mt-2 text-muted">Assigned work, created tasks, and open clinic handover items.</p>
+    <div className="mx-auto max-w-5xl space-y-5">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div>
+          <h1 className="font-heading text-4xl font-semibold text-text md:text-5xl">Tasks</h1>
+          <p className="mt-2 text-muted">Your tasks and team jobs in one place.</p>
+        </div>
+        <Button type="button" onClick={() => navigate('/create')}>New task</Button>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-surface p-2">
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-border bg-surface p-2">
         {tabs.map((tab) => (
           <button
             key={tab.value}
             type="button"
             className={cn(
-              'rounded-full px-4 py-2 text-sm font-semibold transition',
-              activeTab === tab.value ? 'bg-text text-surface' : 'text-muted hover:bg-background hover:text-text',
+              'rounded-xl px-4 py-2 text-sm font-semibold transition',
+              activeTab === tab.value ? 'bg-accent/10 text-accentDark' : 'text-muted hover:bg-background hover:text-text',
             )}
             onClick={() => setActiveTab(tab.value)}
           >
@@ -149,123 +126,60 @@ export function MyTasksPage() {
         ))}
       </div>
 
-      <section className="grid gap-3 rounded-lg border border-border bg-surface p-4 md:grid-cols-2 xl:grid-cols-6">
-        <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tasks" className="xl:col-span-2" />
-        <Select value={status} onChange={(event) => setStatus(event.target.value as TaskStatus | '')}>
-          <option value="">All statuses</option>
-          {taskStatuses.map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}
-        </Select>
-        <Select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority | '')}>
-          <option value="">All priorities</option>
-          {taskPriorities.map((item) => <option key={item} value={item}>{priorityLabels[item]}</option>)}
-        </Select>
-        <Select value={category} onChange={(event) => setCategory(event.target.value as TaskCategory | '')}>
-          <option value="">All categories</option>
-          {taskCategories.map((item) => <option key={item} value={item}>{categoryLabels[item]}</option>)}
-        </Select>
-        <Select value={assignee} onChange={(event) => setAssignee(event.target.value)}>
-          <option value="">All assignees</option>
-          {profiles.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}
-        </Select>
+      <div className="grid gap-3 md:grid-cols-[1fr_auto_180px]">
+        <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tasks" />
+        <Button type="button" variant="secondary" className="gap-2" onClick={() => setFiltersOpen((value) => !value)}>
+          <SlidersHorizontal className="h-4 w-4" /> Filters
+        </Button>
         <Select value={sort} onChange={(event) => setSort(event.target.value as SortMode)}>
-          <option value="priority">Sort by priority</option>
+          <option value="attention">Sort by attention</option>
           <option value="due_date">Sort by due date</option>
           <option value="newest">Sort by newest</option>
         </Select>
-      </section>
-
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {quickFilters.map((filter) => (
-          <button
-            key={filter.value}
-            type="button"
-            className={cn(
-              'shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition',
-              quickFilter === filter.value
-                ? 'border-accent bg-accent text-white'
-                : 'border-border bg-surface text-muted hover:border-accent hover:text-text',
-            )}
-            onClick={() => setQuickFilter((current) => (current === filter.value ? '' : filter.value))}
-          >
-            {filter.label}
-          </button>
-        ))}
       </div>
 
-      {error ? <p className="rounded-lg border border-urgent/30 bg-urgent/5 px-4 py-3 text-sm text-urgent">{error}</p> : null}
+      {filtersOpen ? (
+        <section className="grid gap-3 rounded-2xl border border-border bg-surface p-4 md:grid-cols-2 xl:grid-cols-5">
+          <Select value={status} onChange={(event) => setStatus(event.target.value as TaskStatus | '')}>
+            <option value="">All statuses</option>
+            {taskStatuses.map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}
+          </Select>
+          <Select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority | '')}>
+            <option value="">All priorities</option>
+            {taskPriorities.map((item) => <option key={item} value={item}>{priorityLabels[item]}</option>)}
+          </Select>
+          <TaskCategoryPicker value={category} allLabel="All categories" allowCreate={false} onChange={(value) => setCategory(value as TaskCategory | '')} />
+          <Select value={assignee} onChange={(event) => setAssignee(event.target.value)}>
+            <option value="">All assignees</option>
+            {profiles.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}
+          </Select>
+          <Select value={dueFilter} onChange={(event) => setDueFilter(event.target.value as DueFilter)}>
+            <option value="">Any due date</option>
+            <option value="overdue">Overdue</option>
+            <option value="due_today">Due today</option>
+            <option value="no_date">No date</option>
+          </Select>
+        </section>
+      ) : null}
+
+      {error ? <p className="rounded-2xl border border-urgent/30 bg-urgent/5 px-4 py-3 text-sm text-urgent">{error}</p> : null}
       {loading ? <TaskListSkeleton /> : null}
 
       {!loading && filteredTasks.length === 0 ? (
-        <EmptyState title="No matching tasks" message="Adjust filters or create a new handover task." />
+        <EmptyState title="No tasks" message={search || status || priority || category || assignee || dueFilter ? 'Try another search or filter.' : emptyMessage(activeTab)} />
       ) : !loading ? (
-        <div className="divide-y divide-border rounded-lg border border-border bg-surface">
+        <div className="grid gap-3">
           {filteredTasks.map((task) => (
-            <article
+            <TaskCard
               key={task.id}
-              className={cn(
-                'grid w-full gap-4 px-5 py-4 text-left transition hover:bg-background lg:grid-cols-[1fr_140px_140px_120px]',
-                task.status === 'completed' ? 'opacity-60' : '',
-                task.status === 'waiting' ? 'bg-warning/5' : '',
-                isOverdue(task.due_date) && task.status !== 'completed' ? 'border-l-2 border-l-urgent' : '',
-              )}
-            >
-              <button type="button" className="text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" onClick={() => setSelectedTask(task)}>
-                <div className="mb-2 flex flex-wrap gap-2">
-                  <PriorityPill priority={task.priority} />
-                  <StatusPill status={task.status} />
-                  <span className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted">
-                    {categoryLabels[task.category]}
-                  </span>
-                </div>
-                <h3 className="font-semibold text-text">{task.title}</h3>
-                <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted">{task.description || 'No description'}</p>
-                {task.patient_reference ? <p className="mt-2 text-xs font-semibold text-accentDark">Ref: {task.patient_reference}</p> : null}
-              </button>
-              <div className="text-sm text-muted">
-                <span className="lg:hidden">Assigned: </span>{task.assigned_to_profile?.full_name ?? 'Unassigned'}
-              </div>
-              <div className="text-sm text-muted">
-                <span className="lg:hidden">Due: </span>
-                <span className={isOverdue(task.due_date) && task.status !== 'completed' ? 'font-semibold text-urgent' : ''}>
-                  {formatDueDate(task.due_date)}
-                </span>
-              </div>
-              <div className="text-sm text-muted">
-                <span className="lg:hidden">Created: </span>{formatDate(task.created_at)}
-              </div>
-              <div className="flex flex-wrap gap-2 lg:col-span-4">
-                {['new', 'waiting'].includes(task.status) ? (
-                  <button type="button" className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted hover:border-accent hover:text-text" onClick={() => void runQuickAction(task.id, 'in_progress')}>
-                    Start
-                  </button>
-                ) : null}
-                {!['completed', 'cancelled'].includes(task.status) ? (
-                  <>
-                    <button type="button" className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted hover:border-warning hover:text-warning" onClick={() => void runQuickAction(task.id, 'waiting')}>
-                      Wait
-                    </button>
-                    <button type="button" className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted hover:border-success hover:text-success" onClick={() => void runQuickAction(task.id, 'completed')}>
-                      Complete
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            </article>
+              task={task}
+              categories={categories}
+              onOpen={openTask}
+              onStatusChange={updateTaskStatus}
+              onComplete={completeTask}
+            />
           ))}
         </div>
-      ) : null}
-
-      {selectedLiveTask ? (
-        <TaskDetailPanel
-          key={`${selectedLiveTask.id}-${selectedLiveTask.updated_at}`}
-          task={selectedLiveTask}
-          profiles={profiles}
-          onClose={() => setSelectedTask(null)}
-          onUpdate={updateTask}
-          onStatusChange={updateTaskStatus}
-          onComplete={completeTask}
-          onDelete={deleteTask}
-        />
       ) : null}
     </div>
   )

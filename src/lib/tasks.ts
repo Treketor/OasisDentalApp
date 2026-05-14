@@ -130,7 +130,7 @@ async function assertCurrentUserCanCreateTasks(userId: string) {
   }
 
   if (!data.is_approved) {
-    throw new Error(`Your staff profile (${data.email}) is not approved yet. Ask an admin or manager to set is_approved = true.`)
+    throw new Error(`Your staff profile (${data.email}) is not approved yet. Ask an admin or manager to approve your account.`)
   }
 
   const { data: debugAccess, error: debugError } = await supabase
@@ -156,6 +156,8 @@ async function assertCurrentUserCanCreateTasks(userId: string) {
 }
 
 async function addTaskEvent(taskId: string, eventType: string, metadata: Record<string, unknown> = {}) {
+  // Future hardening: generate audit events in database triggers or RPCs so
+  // history cannot be skipped by a modified client.
   const userId = await getCurrentUserId()
   const { error } = await supabase.from('task_events').insert({
     task_id: taskId,
@@ -165,7 +167,15 @@ async function addTaskEvent(taskId: string, eventType: string, metadata: Record<
   })
 
   if (error) {
-    console.warn('Task event was not recorded', error)
+    if (import.meta.env.DEV) console.warn('Task event was not recorded', error)
+  }
+}
+
+async function addTaskEventSafe(taskId: string, eventType: string, metadata: Record<string, unknown> = {}) {
+  try {
+    await addTaskEvent(taskId, eventType, metadata)
+  } catch (err) {
+    if (import.meta.env.DEV) console.warn('Task event was not recorded', err)
   }
 }
 
@@ -218,7 +228,7 @@ export async function createTask(input: CreateTaskInput) {
   }
 
   const task = await getTaskById(taskId)
-  await addTaskEvent(task.id, 'task_created')
+  await addTaskEventSafe(task.id, 'task_created')
   if (task.assigned_to && task.assigned_to !== userId) {
     void createTaskAssignedNotification(task.id, task.assigned_to)
   }
@@ -239,8 +249,46 @@ export async function updateTask(taskId: string, updates: UpdateTaskInput) {
     throw new Error(error.message)
   }
 
-  await addTaskEvent(taskId, 'task_updated', { fields: Object.keys(updates) })
   const task = data as TaskWithProfiles
+  const eventTasks: Array<Promise<void>> = []
+  const changedFields = Object.keys(updates).filter((field) => {
+    const key = field as keyof UpdateTaskInput
+    return updates[key] !== undefined && updates[key] !== previousTask[key as keyof Task]
+  })
+
+  if (changedFields.length > 0) {
+    eventTasks.push(addTaskEventSafe(taskId, 'task_updated', { fields: changedFields }))
+  }
+
+  if (updates.assigned_to !== undefined && updates.assigned_to !== previousTask.assigned_to) {
+    eventTasks.push(addTaskEventSafe(taskId, previousTask.assigned_to ? (updates.assigned_to ? 'task_reassigned' : 'task_unassigned') : 'task_assigned', {
+      previous_assigned_to: previousTask.assigned_to,
+      next_assigned_to: updates.assigned_to,
+    }))
+  }
+
+  if (updates.status && updates.status !== previousTask.status) {
+    eventTasks.push(addTaskEventSafe(taskId, updates.status === 'completed' ? 'task_completed' : updates.status === 'cancelled' ? 'task_cancelled' : 'status_changed', {
+      previous_status: previousTask.status,
+      next_status: updates.status,
+    }))
+  }
+
+  if (updates.priority && updates.priority !== previousTask.priority) {
+    eventTasks.push(addTaskEventSafe(taskId, 'priority_changed', {
+      previous_priority: previousTask.priority,
+      next_priority: updates.priority,
+    }))
+  }
+
+  if (updates.due_date !== undefined && updates.due_date !== previousTask.due_date) {
+    eventTasks.push(addTaskEventSafe(taskId, 'due_date_changed', {
+      previous_due_date: previousTask.due_date,
+      next_due_date: updates.due_date,
+    }))
+  }
+
+  await Promise.all(eventTasks)
 
   if (
     updates.assigned_to !== undefined
@@ -277,7 +325,6 @@ export async function updateTaskStatus(taskId: string, status: TaskStatus) {
   }
 
   const task = await updateTask(taskId, updates)
-  await addTaskEvent(taskId, 'status_changed', { status })
   return task
 }
 
@@ -286,12 +333,11 @@ export async function completeTask(taskId: string) {
     status: 'completed',
     completed_at: new Date().toISOString(),
   })
-  await addTaskEvent(taskId, 'task_completed')
   return task
 }
 
 export async function deleteTask(taskId: string) {
-  await addTaskEvent(taskId, 'task_deleted')
+  await addTaskEventSafe(taskId, 'task_deleted')
   const { error } = await supabase.from('tasks').delete().eq('id', taskId)
 
   if (error) {
@@ -344,7 +390,7 @@ export async function addTaskComment(taskId: string, body: string) {
     throw new Error(error.message)
   }
 
-  await addTaskEvent(taskId, 'comment_added')
+  await addTaskEventSafe(taskId, 'comment_added')
   const recipients = new Set<string>()
   if (task.created_by !== userId) recipients.add(task.created_by)
   if (task.assigned_to && task.assigned_to !== userId) recipients.add(task.assigned_to)

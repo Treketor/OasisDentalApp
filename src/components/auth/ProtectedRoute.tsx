@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { Button } from '../ui/Button'
+import { formatRoleLabel } from '../../lib/labels'
 import { useAuth } from './useAuth'
 
 function CenteredState({ title, message, action }: { title: string; message: string; action?: ReactNode }) {
@@ -54,11 +55,13 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
         message="Your account has been created, but a manager needs to approve access before you can use Oasis Tasks."
         action={
           <div className="space-y-5">
+            <p className="rounded-lg border border-border bg-background px-4 py-3 text-sm leading-6 text-muted">
+              You do not need to register again. Refresh this status after a manager approves your access.
+            </p>
             <div className="rounded-lg border border-border bg-background p-4 text-left text-sm text-muted">
               <p><span className="font-semibold text-text">Name:</span> {profile.full_name}</p>
               <p><span className="font-semibold text-text">Email:</span> {profile.email || user?.email}</p>
-              <p><span className="font-semibold text-text">Role:</span> {profile.role}</p>
-              {profile.location ? <p><span className="font-semibold text-text">Location:</span> {profile.location}</p> : null}
+              <p><span className="font-semibold text-text">Role:</span> {formatRoleLabel(profile.role)}</p>
             </div>
             <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Button type="button" variant="secondary" onClick={refreshProfile}>

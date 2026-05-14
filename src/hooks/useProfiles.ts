@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   approveProfile as approveProfileService,
@@ -11,6 +11,7 @@ import {
 import type { Profile, UserRole } from '../types/database'
 
 export function useProfiles() {
+  const channelNameRef = useRef(`profiles-realtime-${crypto.randomUUID()}`)
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -34,7 +35,7 @@ export function useProfiles() {
     }, 0)
 
     const channel = supabase
-      .channel('profiles-realtime')
+      .channel(channelNameRef.current)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
         void refreshProfiles()
       })
@@ -51,10 +52,10 @@ export function useProfiles() {
   }, [])
 
   const approveProfile = useCallback(
-    async (profileId: string, role: UserRole, location?: string | null) => {
+    async (profileId: string, role: UserRole, staffCategory?: string | null) => {
       setError('')
       try {
-        const profile = await approveProfileService(profileId, role, location)
+        const profile = await approveProfileService(profileId, role, staffCategory)
         replaceProfile(profile)
         return profile
       } catch (err) {

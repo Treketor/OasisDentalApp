@@ -1,19 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { roleFromStaffCategory } from '../../lib/workspaceSettings'
 import type { UserRole } from '../../types/database'
+import { StaffCategoryPicker } from '../staff/StaffCategoryPicker'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
 
 type AuthMode = 'login' | 'register'
 type RequestedRole = Extract<UserRole, 'receptionist' | 'nurse' | 'dentist'>
-
-const roleOptions: Array<{ value: RequestedRole; label: string }> = [
-  { value: 'receptionist', label: 'Receptionist' },
-  { value: 'nurse', label: 'Nurse' },
-  { value: 'dentist', label: 'Dentist' },
-]
 
 function getAuthErrorMessage(message: string) {
   const lowerMessage = message.toLowerCase()
@@ -39,8 +34,8 @@ export function AuthForm() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [location, setLocation] = useState('')
   const [requestedRole, setRequestedRole] = useState<RequestedRole | ''>('')
+  const [requestedStaffCategory, setRequestedStaffCategory] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -79,6 +74,7 @@ export function AuthForm() {
     }
 
     setLoading(true)
+    const safeRole = requestedStaffCategory ? roleFromStaffCategory(requestedStaffCategory) : requestedRole || 'receptionist'
 
     if (isRegistering) {
       const { error: signUpError } = await supabase.auth.signUp({
@@ -87,8 +83,8 @@ export function AuthForm() {
         options: {
           data: {
             full_name: fullName.trim(),
-            requested_role: requestedRole || 'receptionist',
-            location: location.trim() || null,
+            requested_role: safeRole,
+            requested_staff_category: requestedStaffCategory || null,
           },
         },
       })
@@ -101,7 +97,7 @@ export function AuthForm() {
       }
 
       setSuccess(
-        'Account created. Confirm the email if Supabase email confirmation is enabled, then a manager must approve access before clinic tasks are available.',
+        'Account created. Confirm the email if Supabase email confirmation is enabled, then a manager must approve access.',
       )
       return
     }
@@ -160,23 +156,15 @@ export function AuthForm() {
               placeholder="Full name"
               autoComplete="name"
             />
-            <Input
-              value={location}
-              onChange={(event) => setLocation(event.target.value)}
-              placeholder="Location, optional"
-              autoComplete="organization"
+            <StaffCategoryPicker
+              value={requestedStaffCategory}
+              allLabel="What best describes your role?"
+              allowCreate={false}
+              onChange={(value) => {
+                setRequestedStaffCategory(value)
+                setRequestedRole(roleFromStaffCategory(value) as RequestedRole)
+              }}
             />
-            <Select
-              value={requestedRole}
-              onChange={(event) => setRequestedRole(event.target.value as RequestedRole | '')}
-            >
-              <option value="">Role request, optional</option>
-              {roleOptions.map((role) => (
-                <option key={role.value} value={role.value}>
-                  {role.label}
-                </option>
-              ))}
-            </Select>
           </>
         ) : null}
 
@@ -197,7 +185,7 @@ export function AuthForm() {
 
         {isRegistering ? (
           <p className="rounded-lg border border-border bg-background px-4 py-3 text-sm leading-6 text-muted">
-            New staff accounts require manager approval before full access. Do not enter full patient names or clinical details into Oasis Tasks.
+            Choose your staff role so managers can approve the right access. Manager/admin access is granted only by an existing manager or admin.
           </p>
         ) : null}
 
