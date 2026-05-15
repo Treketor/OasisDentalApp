@@ -6,6 +6,7 @@ export interface ProfileUpdateInput {
   full_name?: string
   role?: UserRole
   staff_category?: string | null
+  hidden_from_staff?: boolean
   location?: string | null
   is_approved?: boolean
   is_active?: boolean
@@ -22,6 +23,10 @@ function getFriendlyProfileError(message: string) {
 
   if (message.includes('staff_category')) {
     return 'Staff category settings are not set up yet. Run supabase/workspace-settings-migration.sql in Supabase.'
+  }
+
+  if (message.includes('hidden_from_staff')) {
+    return 'Staff list privacy is not set up yet. Run supabase/hidden-profile-migration.sql in Supabase.'
   }
 
   if (message.toLowerCase().includes('row-level security')) {

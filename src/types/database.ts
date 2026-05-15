@@ -13,6 +13,7 @@ export interface Profile {
   role: UserRole
   location: string | null
   staff_category?: string | null
+  hidden_from_staff?: boolean
   is_approved: boolean
   is_active?: boolean
   rejected_at?: string | null

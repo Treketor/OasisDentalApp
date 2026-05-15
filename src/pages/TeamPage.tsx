@@ -270,16 +270,17 @@ export function TeamPage() {
   const visibleProfiles = useMemo(() => {
     const source =
       activeTab === 'pending' ? pendingProfiles : activeTab === 'inactive' ? inactiveProfiles : approvedProfiles
+    const staffVisibleSource = source.filter((profile) => !profile.hidden_from_staff || profile.id === currentProfile?.id)
     const query = search.trim().toLowerCase()
 
-    if (!query) return source
+    if (!query) return staffVisibleSource
 
-    return source.filter((profile) =>
+    return staffVisibleSource.filter((profile) =>
       [profile.full_name, profile.email, profile.role]
         .filter(Boolean)
         .some((value) => value?.toLowerCase().includes(query)),
     )
-  }, [activeTab, approvedProfiles, inactiveProfiles, pendingProfiles, search])
+  }, [activeTab, approvedProfiles, currentProfile?.id, inactiveProfiles, pendingProfiles, search])
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
