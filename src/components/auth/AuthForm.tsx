@@ -2,13 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { roleFromStaffCategory } from '../../lib/workspaceSettings'
-import type { UserRole } from '../../types/database'
 import { StaffCategoryPicker } from '../staff/StaffCategoryPicker'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 
 type AuthMode = 'login' | 'register'
-type RequestedRole = Extract<UserRole, 'receptionist' | 'nurse' | 'dentist'>
 
 function getAuthErrorMessage(message: string) {
   const lowerMessage = message.toLowerCase()
@@ -34,7 +32,6 @@ export function AuthForm() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [requestedRole, setRequestedRole] = useState<RequestedRole | ''>('')
   const [requestedStaffCategory, setRequestedStaffCategory] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -74,7 +71,7 @@ export function AuthForm() {
     }
 
     setLoading(true)
-    const safeRole = requestedStaffCategory ? roleFromStaffCategory(requestedStaffCategory) : requestedRole || 'receptionist'
+    const safeRole = roleFromStaffCategory(requestedStaffCategory)
 
     if (isRegistering) {
       const { error: signUpError } = await supabase.auth.signUp({
@@ -156,15 +153,16 @@ export function AuthForm() {
               placeholder="Full name"
               autoComplete="name"
             />
-            <StaffCategoryPicker
-              value={requestedStaffCategory}
-              allLabel="What best describes your role?"
-              allowCreate={false}
-              onChange={(value) => {
-                setRequestedStaffCategory(value)
-                setRequestedRole(roleFromStaffCategory(value) as RequestedRole)
-              }}
-            />
+            <label className="block text-sm font-semibold text-text">
+              What best describes your role?
+              <StaffCategoryPicker
+                value={requestedStaffCategory}
+                allLabel="Choose staff category"
+                allowCreate={false}
+                className="mt-2"
+                onChange={setRequestedStaffCategory}
+              />
+            </label>
           </>
         ) : null}
 
@@ -185,7 +183,7 @@ export function AuthForm() {
 
         {isRegistering ? (
           <p className="rounded-lg border border-border bg-background px-4 py-3 text-sm leading-6 text-muted">
-            Choose your staff role so managers can approve the right access. Manager/admin access is granted only by an existing manager or admin.
+            Choose your staff category so managers can approve the right access. Manager/admin access is granted only by an existing manager or admin.
           </p>
         ) : null}
 
