@@ -63,6 +63,46 @@ export interface TaskEvent {
   created_at: string
 }
 
+export interface TaskTemplate {
+  id: string
+  name: string
+  description: string | null
+  default_title: string
+  default_description: string | null
+  default_priority: TaskPriority
+  default_category: TaskCategory
+  default_location: string | null
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SavedTaskView {
+  id: string
+  user_id: string
+  name: string
+  filters: Record<string, unknown>
+  sort_key: string
+  is_default: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface HandoverNote {
+  id: string
+  title: string
+  body: string | null
+  location: string | null
+  shift_date: string
+  created_by: string
+  pinned: boolean
+  resolved_at: string | null
+  resolved_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type NotificationType =
   | 'task_assigned'
   | 'task_reassigned'

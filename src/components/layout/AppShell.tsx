@@ -6,8 +6,26 @@ import { Button } from '../ui/Button'
 import { cn } from '../../lib/cn'
 import { roleLabels } from '../../lib/taskLabels'
 import { NotificationBell } from '../notifications/NotificationBell'
+import { isManagerOrAdmin } from '../../lib/permissions'
 
-const navItems = [
+const desktopNavItems = [
+  { label: 'Dashboard', to: '/' },
+  { label: 'My Tasks', to: '/my-tasks' },
+  { label: 'Create', to: '/create' },
+  { label: 'Handover', to: '/handover' },
+  { label: 'Team', to: '/team' },
+  { label: 'Settings', to: '/settings' },
+]
+
+const staffMobileNavItems = [
+  { label: 'Dashboard', to: '/' },
+  { label: 'My Tasks', to: '/my-tasks' },
+  { label: 'Create', to: '/create' },
+  { label: 'Handover', to: '/handover' },
+  { label: 'Settings', to: '/settings' },
+]
+
+const managerMobileNavItems = [
   { label: 'Dashboard', to: '/' },
   { label: 'My Tasks', to: '/my-tasks' },
   { label: 'Create', to: '/create' },
@@ -25,6 +43,7 @@ export function AppShell() {
   const { profile, signOut } = useAuth()
   const [accountOpen, setAccountOpen] = useState(false)
   const showNavigation = profile?.is_approved === true
+  const mobileNavItems = isManagerOrAdmin(profile) ? managerMobileNavItems : staffMobileNavItems
 
   return (
     <div className="min-h-screen bg-background text-text">
@@ -76,7 +95,7 @@ export function AppShell() {
         {showNavigation ? (
         <aside className="sticky top-20 hidden h-[calc(100vh-5rem)] border-r border-border px-5 py-8 lg:block">
           <nav className="flex flex-col gap-2">
-            {navItems.map((item) => (
+            {desktopNavItems.map((item) => (
               <NavLink key={item.to} to={item.to} end={item.to === '/'} className={navClass}>
                 {item.label}
               </NavLink>
@@ -92,7 +111,7 @@ export function AppShell() {
 
       {showNavigation ? (
       <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-surface px-2 py-2 lg:hidden">
-        {navItems.map((item) => (
+        {mobileNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

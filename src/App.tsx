@@ -3,6 +3,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { AppShell } from './components/layout/AppShell'
 import { CreateTaskPage } from './pages/CreateTaskPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { HandoverPage } from './pages/Handover'
 import { LoginPage } from './pages/LoginPage'
 import { MyTasksPage } from './pages/MyTasksPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -23,6 +24,7 @@ function App() {
         <Route index element={<DashboardPage />} />
         <Route path="/my-tasks" element={<MyTasksPage />} />
         <Route path="/create" element={<CreateTaskPage />} />
+        <Route path="/handover" element={<HandoverPage />} />
         <Route path="/team" element={<TeamPage />} />
         <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
         <Route path="/settings" element={<SettingsPage />} />

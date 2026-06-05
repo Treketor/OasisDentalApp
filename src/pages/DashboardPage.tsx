@@ -8,6 +8,7 @@ import { PriorityPill } from '../components/ui/PriorityPill'
 import { StatusPill } from '../components/ui/StatusPill'
 import { useTasks } from '../hooks/useTasks'
 import { useProfiles } from '../hooks/useProfiles'
+import { useHandoverNotes } from '../hooks/useHandoverNotes'
 import { isManagerOrAdmin } from '../lib/permissions'
 import { isDueToday, isOverdue, isThisWeek, formatDueDate } from '../lib/dates'
 import type { TaskWithProfiles } from '../lib/tasks'
@@ -49,10 +50,19 @@ function TaskSection({ title, tasks }: { title: string; tasks: TaskWithProfiles[
   )
 }
 
+function todayDate() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 export function DashboardPage() {
   const { profile } = useAuth()
   const { tasks, loading, error } = useTasks()
   const { pendingProfiles } = useProfiles()
+  const { notes: handoverNotes, error: handoverError } = useHandoverNotes({
+    shift_date: todayDate(),
+    includeResolved: false,
+    limit: 4,
+  })
   const showPendingAlert = isManagerOrAdmin(profile) && pendingProfiles.length > 0
 
   const openTasks = tasks.filter((task) => task.status !== 'completed' && task.status !== 'cancelled')
@@ -130,6 +140,41 @@ export function DashboardPage() {
           </Card>
         ))}
       </section> : null}
+
+      {!handoverError || isManagerOrAdmin(profile) ? (
+        <Card>
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="font-heading text-3xl font-semibold uppercase text-text">Today’s handover</h2>
+              <p className="mt-1 text-sm text-muted">Pinned and open shift notes for today.</p>
+            </div>
+            <Link
+              to="/handover"
+              className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-surface px-4 text-sm font-semibold text-text transition hover:border-accent hover:text-accentDark"
+            >
+              Open handover
+            </Link>
+          </div>
+          {handoverError ? (
+            <p className="mt-4 text-sm text-muted">Handover setup needed: run supabase/handover-migration.sql.</p>
+          ) : handoverNotes.length === 0 ? (
+            <p className="mt-4 rounded-lg border border-border bg-background px-4 py-3 text-sm text-muted">No open handover notes for today.</p>
+          ) : (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {handoverNotes.map((note) => (
+                <article key={note.id} className="rounded-lg border border-border bg-background p-4">
+                  <div className="flex flex-wrap gap-2">
+                    {note.pinned ? <span className="rounded-full border border-accent px-3 py-1 text-xs font-semibold text-accentDark">Pinned</span> : null}
+                    {note.location ? <span className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted">{note.location}</span> : null}
+                  </div>
+                  <p className="mt-3 font-semibold text-text">{note.title}</p>
+                  {note.body ? <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted">{note.body}</p> : null}
+                </article>
+              ))}
+            </div>
+          )}
+        </Card>
+      ) : null}
 
       {loading ? (
         <TaskListSkeleton />

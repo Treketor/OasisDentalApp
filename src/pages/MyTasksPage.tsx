@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { TaskDetailPanel } from '../components/tasks/TaskDetailPanel'
+import { Button } from '../components/ui/Button'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Input } from '../components/ui/Input'
 import { PriorityPill } from '../components/ui/PriorityPill'
@@ -10,6 +11,7 @@ import { TaskListSkeleton } from '../components/ui/Skeleton'
 import { StatusPill } from '../components/ui/StatusPill'
 import { useAuth } from '../components/auth/useAuth'
 import { useAssignableProfiles } from '../hooks/useAssignableProfiles'
+import { useSavedTaskViews } from '../hooks/useSavedTaskViews'
 import { useTasks } from '../hooks/useTasks'
 import {
   categoryLabels,
@@ -24,10 +26,22 @@ import { formatDueDate, isDueToday, isOverdue, isThisWeek } from '../lib/dates'
 import type { TaskWithProfiles } from '../lib/tasks'
 import type { TaskCategory, TaskPriority, TaskStatus } from '../types/database'
 import { cn } from '../lib/cn'
+import { isManagerOrAdmin } from '../lib/permissions'
+import type { SavedTaskView } from '../types/database'
 
 type Tab = 'assigned' | 'created' | 'open' | 'completed'
 type SortMode = 'priority' | 'due_date' | 'newest'
 type QuickFilter = 'due_today' | 'overdue' | 'urgent' | 'waiting' | 'unassigned' | 'completed_week'
+
+interface SavedTaskFilters extends Record<string, unknown> {
+  activeTab: Tab
+  search: string
+  status: TaskStatus | ''
+  priority: TaskPriority | ''
+  category: TaskCategory | ''
+  assignee: string
+  quickFilter: QuickFilter | ''
+}
 
 const tabs: Array<{ value: Tab; label: string }> = [
   { value: 'assigned', label: 'Assigned to me' },
@@ -54,6 +68,13 @@ export function MyTasksPage() {
   const { profile } = useAuth()
   const { profiles } = useAssignableProfiles()
   const { tasks, loading, error, updateTask, updateTaskStatus, completeTask, deleteTask } = useTasks()
+  const {
+    views,
+    error: savedViewsError,
+    createSavedTaskView,
+    deleteSavedTaskView,
+    setDefaultSavedTaskView,
+  } = useSavedTaskViews()
   const [activeTab, setActiveTab] = useState<Tab>('assigned')
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<TaskStatus | ''>('')
@@ -63,6 +84,34 @@ export function MyTasksPage() {
   const [sort, setSort] = useState<SortMode>('priority')
   const [quickFilter, setQuickFilter] = useState<QuickFilter | ''>('')
   const [selectedTask, setSelectedTask] = useState<TaskWithProfiles | null>(null)
+  const [defaultViewApplied, setDefaultViewApplied] = useState(false)
+
+  function getCurrentFilters(): SavedTaskFilters {
+    return { activeTab, search, status, priority, category, assignee, quickFilter }
+  }
+
+  function applySavedView(view: SavedTaskView) {
+    const filters = view.filters as Partial<SavedTaskFilters>
+    if (filters.activeTab) setActiveTab(filters.activeTab)
+    setSearch(filters.search ?? '')
+    setStatus(filters.status ?? '')
+    setPriority(filters.priority ?? '')
+    setCategory(filters.category ?? '')
+    setAssignee(filters.assignee ?? '')
+    setQuickFilter(filters.quickFilter ?? '')
+    setSort((view.sort_key as SortMode) || 'priority')
+  }
+
+  useEffect(() => {
+    if (defaultViewApplied || views.length === 0) return
+    const defaultView = views.find((view) => view.is_default)
+    const timeoutId = window.setTimeout(() => {
+      if (defaultView) applySavedView(defaultView)
+      setDefaultViewApplied(true)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [defaultViewApplied, views])
 
   useEffect(() => {
     const taskId = searchParams.get('task')
@@ -126,6 +175,43 @@ export function MyTasksPage() {
     }
   }
 
+  async function handleSaveCurrentView() {
+    const name = window.prompt('Name this saved view')
+    if (!name?.trim()) return
+
+    try {
+      await createSavedTaskView({
+        name,
+        filters: getCurrentFilters(),
+        sort_key: sort,
+        is_default: views.length === 0,
+      })
+      toast.success('View saved')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Saved view failed')
+    }
+  }
+
+  async function handleSetDefault(viewId: string) {
+    try {
+      await setDefaultSavedTaskView(viewId)
+      toast.success('Default view updated')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Default view failed')
+    }
+  }
+
+  async function handleDeleteView(viewId: string) {
+    try {
+      await deleteSavedTaskView(viewId)
+      toast.success('Saved view deleted')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Delete failed')
+    }
+  }
+
+  const savedViewsMissing = savedViewsError.includes('not set up yet')
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div>
@@ -173,6 +259,56 @@ export function MyTasksPage() {
           <option value="newest">Sort by newest</option>
         </Select>
       </section>
+
+      {!savedViewsMissing ? (
+        <section className="rounded-lg border border-border bg-surface p-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex gap-2 overflow-x-auto pb-1 lg:pb-0">
+              {views.length === 0 ? (
+                <p className="px-1 py-2 text-sm text-muted">No saved views yet.</p>
+              ) : (
+                views.map((view) => (
+                  <button
+                    key={view.id}
+                    type="button"
+                    className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-accent hover:text-text"
+                    onClick={() => applySavedView(view)}
+                  >
+                    {view.name}{view.is_default ? ' *' : ''}
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => void handleSaveCurrentView()}>
+                Save current view
+              </Button>
+              {views.length > 0 ? (
+                <Select className="h-9 min-w-40" onChange={(event) => event.target.value && applySavedView(views.find((view) => view.id === event.target.value)!)} value="">
+                  <option value="">Saved views</option>
+                  {views.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
+                </Select>
+              ) : null}
+              {views.length > 0 ? (
+                <Select className="h-9 min-w-40" onChange={(event) => event.target.value && void handleSetDefault(event.target.value)} value="">
+                  <option value="">Set default</option>
+                  {views.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
+                </Select>
+              ) : null}
+              {views.length > 0 ? (
+                <Select className="h-9 min-w-40" onChange={(event) => event.target.value && void handleDeleteView(event.target.value)} value="">
+                  <option value="">Delete view</option>
+                  {views.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
+                </Select>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : isManagerOrAdmin(profile) ? (
+        <p className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted">
+          Saved views need setup: run supabase/saved-views-migration.sql.
+        </p>
+      ) : null}
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {quickFilters.map((filter) => (
