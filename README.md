@@ -1,73 +1,25 @@
-# React + TypeScript + Vite
+# Oasis Tasks - Clinic Task Board
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Oasis Tasks is a lightweight internal task board I built for a dental clinic (my partner's workplace), so the team can capture and track the small jobs that keep a busy practice running.
 
-Currently, two official plugins are available:
+## What it does
+- Quick jobs: receptionists, nurses, dentists and managers can create tasks in seconds.
+- Reminders and updates: assign reminders and add progress updates to a job.
+- Staff approvals: managers can approve and manage staff and their access.
+- Shift notes: leave handover notes between shifts.
+- Search: quickly find the work that is visible to you.
+- Manager and admin export: export the visible data for managers and admins.
+- Role-aware views: what each person sees and can do depends on their role.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Tech
+React, TypeScript, Vite, Tailwind CSS, React Router, Supabase (PostgreSQL), and Sonner for notifications. Deployed on Vercel.
 
-## React Compiler
+## Running locally
+\`\`\`bash
+npm install
+npm run dev
+\`\`\`
+Copy `.env.example` to `.env.local` and add your Supabase URL and anon key.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Notes
+A real internal tool built for a working dental practice, focused on being fast and simple for non-technical staff to use during a busy day.
